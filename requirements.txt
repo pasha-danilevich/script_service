@@ -1,0 +1,14 @@
+pandas
+openpyxl
+sqlalchemy
+elasticsearch
+tortoise-orm
+asyncpg
+xlsxwriter
+docxtpl
+xlrd
+pydantic
+pydantic_settings
+psycopg2-binary
+python-dotenv
+transliterate
