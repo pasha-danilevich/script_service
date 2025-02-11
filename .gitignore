@@ -12,3 +12,4 @@ migrations/
 *.env
 *.xls
 *.csv
+*.sql
