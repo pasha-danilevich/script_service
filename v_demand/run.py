@@ -23,7 +23,7 @@ def task_three():
     df_privileges = get_df_from_sql( 'privileges_2024_2.sql', engine_promed)
     df_group = get_df_from_sql('s.sql', engine_single_3)
     df_group['Идентификатор пациента'] = pd.to_numeric(df_group['Идентификатор пациента'], errors='coerce')
-    # test commit
+
     result_df = pd.merge(
         df_group,  # Левый DataFrame
         df_privileges,  # Правый DataFrame
