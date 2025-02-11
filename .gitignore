@@ -1,0 +1,14 @@
+.venv
+.idea
+/venv/
+.pytest_cache
+/logs.log
+
+.lock
+__pycache__
+migrations/
+*.xlsx
+*.xlsx#
+*.env
+*.xls
+*.csv
