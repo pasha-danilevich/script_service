@@ -5,7 +5,7 @@ import pandas as pd
 from sqlalchemy import Engine
 
 from settings import BASE_PATH, engine_single_3, engine_promed
-from utils import DataReader, ExcelHandler
+from utils import Repository, ExcelHandler
 
 
 current_file_path = Path(__file__).resolve()
@@ -14,7 +14,7 @@ dir_name = current_file_path.parent.name
 
 def get_df_from_sql(sql_name: str, sql_engine: Engine) -> pd.DataFrame:
     sql_path = os.path.join(BASE_PATH, dir_name, sql_name)
-    data_reader = DataReader(sql_engine)
+    data_reader = Repository(sql_engine)
     sql_template = data_reader.read_sql_file(sql_path)
     df: pd.DataFrame = data_reader.execute_query(sql_template)
     return df
@@ -49,7 +49,7 @@ def task_two():
     eh.write_excel(df, dir_name, file_name='result.xlsx')
     ids_tuple = tuple(df["Идентификатор пациента"].tolist())
 
-    pormed_data_reader = DataReader(engine_promed)
+    pormed_data_reader = Repository(engine_promed)
     sql_path = os.path.join(BASE_PATH, dir_name, 'privileg_2024.sql')
     sql_privileges_template = pormed_data_reader.read_sql_file(sql_path)
     df: pd.DataFrame = pormed_data_reader.execute_query(sql_privileges_template, {'ids': ids_tuple})
@@ -57,17 +57,18 @@ def task_two():
     df = df.pivot_table(index='МО', columns='Месяц 2024 года', values='Количество пациентов', aggfunc="sum",
                         fill_value=0, margins=True, margins_name='Всего').reset_index()
 
+    df = df.rename(columns={100.0: 'Ранее 2024'})
+
     eh = ExcelHandler()
     eh.write_excel(df, dir_name, file_name='Заявка Доп 2025 пациенты выкл. в рег. 2024.01.01 - 2024.12.31.xlsx')
 
 
 def main():
 
-    # task_two()
 
     sql_path = os.path.join(BASE_PATH, dir_name, 's.sql')
 
-    data_reader = DataReader(engine_single_3)
+    data_reader = Repository(engine_single_3)
 
     sql_template = data_reader.read_sql_file(sql_path)
     df: pd.DataFrame = data_reader.execute_query(sql_template)
@@ -80,6 +81,7 @@ def main():
 
 
 if __name__ == '__main__':
-    task_three()
+    # task_three()
     # main()
+    task_two()
 

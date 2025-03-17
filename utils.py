@@ -10,6 +10,12 @@ from settings import BASE_PATH
 
 
 class ExcelHandler:
+    def __init__(self):
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        pd.set_option('display.width', None)
+        pd.set_option('display.max_colwidth', None)
+
 
     @staticmethod
     def read_excel(file_path, **kwargs):
@@ -17,17 +23,17 @@ class ExcelHandler:
         return pd.read_excel(file_path, **kwargs)
 
     @staticmethod
-    def write_excel(df: pd.DataFrame, dir_name: str, file_name: str = None):
+    def write_excel(df: pd.DataFrame, dir_name: str, file_name: str = None, index: bool = False):
         file_name = file_name if file_name else 'noname.xlsx'
-        file_path = os.path.join(BASE_PATH, dir_name, file_name)
-
+        file_path = os.path.join(BASE_PATH, dir_name, 'result', file_name)
+        # TODO: add "result" folder
         with pd.ExcelWriter(file_name) as wr:
-            df.to_excel(wr, index=False, sheet_name='A')
+            df.to_excel(wr, index=index, sheet_name='A')
             wr.sheets['A'].autofit()
             wr.sheets['A'].autofilter(0, 0, df.shape[0], df.shape[1])
 
 
-class DataReader:
+class Repository:
     def __init__(self, engine):
         """
         Инициализация класса.
@@ -42,7 +48,7 @@ class DataReader:
 
 
     @staticmethod
-    def read_sql_file(sql_path):
+    def read_sql_file(sql_path: Path):
         """
         Чтение SQL-запроса из файла.
         :param sql_path: Путь к sql файлу
