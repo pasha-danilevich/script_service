@@ -12,6 +12,56 @@ import utils
 from settings import BASE_PATH, engine
 from pathlib import Path
 
+def expand_mkb_10_ranges(df: pd.DataFrame, mkb_column_name: str, health_group_name: str) -> pd.DataFrame:
+
+    df[mkb_column_name] = df[mkb_column_name].str.strip()
+
+    # Фильтрация значений в столбце 'код', длина которых больше N
+    range_codes = df[df[mkb_column_name].str.contains('-')]
+
+    indexes_to_remove = df[df[mkb_column_name].str.contains('-')].index
+    df.drop(indexes_to_remove, inplace=True)
+
+    expanded_rows = []
+    for index, row in range_codes.iterrows():
+
+        raw_range: str = convert_to_latin(cast(str, row[0])) # D00-D09, D80.0-D80.9
+
+        number_type = 'float' if '.' in raw_range else 'int'
+
+        health_group = row[1] # I, II, etc
+
+        letter = raw_range[0] # A, B, D etc
+        start, end = raw_range.split("-", 1) # D00, D09
+        if letter == 'D':
+            print()
+        if number_type == 'int':
+            start = int(start[1:])
+            end = int(end[1:])
+        elif number_type == 'float':
+            start = int(start[-1])
+            end = int(end[-1])
+
+        range_ = end - start + 1
+        if raw_range == 'I48-I49':
+            print(start, end)
+        range_list = []
+        if number_type == 'int':
+            r_start = start % 10
+            range_list = [f'{letter}{raw_range[1]}{num}' if num <= 9 else f'{letter}{num}' for num in range(r_start, r_start+range_)]
+        elif number_type == 'float':
+            range_list = [f'{letter}{raw_range[1:3]}.{num}' for num in range(range_)]
+
+
+
+        for code in range_list:
+            expanded_rows.append([code, health_group])
+
+    df_expanded = pd.DataFrame(expanded_rows, columns=[mkb_column_name, health_group_name])
+
+    df = pd.concat([df, df_expanded], axis=0)
+
+    return df
 
 current_file_path = Path(__file__).resolve()
 dir_name = current_file_path.parent.name
@@ -27,7 +77,7 @@ def get_df_mkb():
     eh = utils.ExcelHandler
     df_mkb = eh.read_excel(MKB_PRIORITY_PATH, skiprows=12, usecols=(0, 1))
     mkb_name, health_group_name = df_mkb.columns.tolist()[:2]
-    df_mkb = utils.expand_mkb_10_ranges(df_mkb, mkb_name, health_group_name)
+    df_mkb = expand_mkb_10_ranges(df_mkb, mkb_name, health_group_name)
     return df_mkb
 
 

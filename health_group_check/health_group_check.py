@@ -1,142 +1,101 @@
-import re
+import warnings
+from pathlib import Path
 from typing import cast
 
 import pandas as pd
-import warnings
-import os
-from dotenv import load_dotenv
-from sqlalchemy import text
-from settings import engine_promed, BASE_PATH
-from utils import expand_mkb_10_ranges
+from transliterate import translit
 
-# from settings import engine_promed
+from settings import BASE_PATH
+
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
-load_dotenv()
+
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
+def convert_to_latin(input_string) -> str:
+    """
+    Проверяет входную строку на наличие кириллических символов и переводит их в латиницу.
 
-mkb_10_column = "код МКБ 10"
-mkb_health_group_column = "группа здоровья"
+    :param input_string: Входная строка для проверки и возможного преобразования.
+    :return: Строка с кириллическими символами заменёнными на латинские или исходная строка, если она была полностью на латыни.
+    """
 
-MKB_PATH = os.path.join(BASE_PATH, 'health_group_check', 'datasets', 'ГРУППЫ_ЗДОРОВЬЯ 1.1.xlsx')
-GROUP_CSV_PATH =  os.path.join(BASE_PATH, 'health_group_check', 'datasets', 'Result_9.csv')
+    # Проверка на наличие кириллических символов
+    if any('а' <= c <= 'я' or 'А' <= c <= 'Я' for c in input_string):
+        # Преобразование в транслитерацию (латиницу)
+        latin_string = translit(input_string, 'ru', reversed=True)
+        return latin_string
+
+    # Если нет кириллических символов — возвращаем исходную строку
+    return input_string
+
+
+def expand_mkb_10_ranges(df: pd.DataFrame, mkb_column_name: str, health_group_name: str) -> pd.DataFrame:
+    df[mkb_column_name] = df[mkb_column_name].str.strip()
+
+    # Фильтрация значений в столбце 'код', длина которых больше N
+    range_codes = df[df[mkb_column_name].str.contains('-')]
+
+    indexes_to_remove = df[df[mkb_column_name].str.contains('-')].index
+    df.drop(indexes_to_remove, inplace=True)
+
+    expanded_rows = []
+    for index, row in range_codes.iterrows():
+
+        raw_range: str = convert_to_latin(cast(str, row[0]))  # D00-D09, D80.0-D80.9
+
+        number_type = 'float' if '.' in raw_range else 'int'
+
+        health_group = row[1]  # I, II, etc
+
+        letter = raw_range[0]  # A, B, D etc
+        start, end = raw_range.split("-", 1)  # D00, D09
+        if letter == 'D':
+            print()
+        if number_type == 'int':
+            start = int(start[1:])
+            end = int(end[1:])
+        elif number_type == 'float':
+            start = int(start[-1])
+            end = int(end[-1])
+
+        range_ = end - start + 1
+        if raw_range == 'I48-I49':
+            print(start, end)
+        range_list = []
+        if number_type == 'int':
+            r_start = start % 10
+            range_list = [f'{letter}{raw_range[1]}{num}' if num <= 9 else f'{letter}{num}' for num in
+                          range(r_start, r_start + range_)]
+        elif number_type == 'float':
+            range_list = [f'{letter}{raw_range[1:3]}.{num}' for num in range(range_)]
+
+        for code in range_list:
+            expanded_rows.append([code, health_group])
+
+    df_expanded = pd.DataFrame(expanded_rows, columns=[mkb_column_name, health_group_name])
+
+    df = pd.concat([df, df_expanded], axis=0)
+
+    return df
 
 
 def read_mkb_file():
-
-    path = MKB_PATH
+    mkb_10_column = "код МКБ 10"
+    mkb_health_group_column = "группа здоровья"
+    path = Path(BASE_PATH, 'health_group_check', 'datasets', 'ГРУППЫ_ЗДОРОВЬЯ 1.1.xlsx')
     df = pd.read_excel(path)
 
     df = expand_mkb_10_ranges(df, mkb_10_column, mkb_health_group_column)
+    return df
+
+
+
+if __name__ == '__main__':
+    df = read_mkb_file()
     print(df)
-    return df
-
-def read_data_file_sql(condition):
-    sql_file = os.path.join(BASE_PATH, 'health_group_check', 'health_query.sql')
-    with open(sql_file, 'r') as f:
-        sql_template = f.read()
-
-    # Подставляем условие в SQL-запрос
-    sql = sql_template.format(condition=condition)
-
-    with engine_promed.connect() as con:
-        df = pd.read_sql_query(text(sql), con=con)
-
-    df = normalize_group(df)
-    return df
-
-def normalize_group(df: pd.DataFrame) -> pd.DataFrame:
-    df['Группа здоровья'] = df['Группа здоровья'].str.upper()
-    return df
-
-def read_data_file_csv():
-
-    path = GROUP_CSV_PATH
-    df = pd.read_csv(path)
-    df = normalize_group(df)
-
-    # print(df.head())
-    return df
-
-# def read_file_prof():
-#     check_df = read_file_check()
-#     mkb_df = read_mkb_file()
-#     print(check_df[:10])
-#
-#
-#
-#     df['Группа здоровья'] = df['Группа здоровья'].str.upper()
-#     df = df[df['Диагноз'] != 'Z00.0']
-#
-#     for row in check_df:
-#
-#         ds_code = row.get('код МКБ 10')
-#         health_group = row.get('группа здоровья')
-#         df.loc[df['Диагноз'].str.contains('|'.join(ds_code), na=False), 'Группа здоровья из справочника'] =  health_group
-#
-#         # df['Соответсвует справочнику'].fillna('Нет', inplace=True)
-#
-#
-#     df.loc[df['Группа здоровья'] == df['Группа здоровья из справочника'], 'Соответсвует справочнику'] = "Да"
-#     df['Соответсвует справочнику'].fillna('Нет', inplace=True)
-
-def make_hash_map(df: pd.DataFrame) -> dict[str, str]:
-    hash_map: dict[str, str] = {}
-
-    for _, row in df.iterrows():
-        hash_map[row[mkb_10_column]] = row[mkb_health_group_column]
-
-    return hash_map
-
-
-
-def write_result(df: pd.DataFrame) -> None:
-    with pd.ExcelWriter('Анализ соответствия групп здоровья профы взрослые.xlsx') as wr:
-        df.to_excel(wr, index=False, sheet_name='A')
-        wr.sheets['A'].autofit()
-        wr.sheets['A'].autofilter(0, 0, df.shape[0], df.shape[1])
-
-def check_diagnosis(row, hash_map):
-    diagnosis = row['Диагноз']
-    health_group = row['Группа здоровья']
-
-    # Проверяем, есть ли диагноз в hash_map и совпадает ли группа здоровья
-    if diagnosis in hash_map:
-        correct_group = hash_map[diagnosis]
-        if correct_group == health_group:
-            return "Да", correct_group  # Группа здоровья совпадает
-        else:
-            return "Нет", correct_group  # Группа здоровья не совпадает
-    else:
-        # Диагноз отсутствует в справочнике, по ТЗ выставляем группу I
-        # и проверяем равна ли группа здоровья 'I'
-        return "Да" if health_group == 'I' else "Нет", 'I'
-
-
-def proces_check():
-    # noinspection SpellCheckingInspection
-    condition = "d.evnpldispprof_setdt between '2025-01-01' and current_date"
-    hash_map = make_hash_map(read_mkb_file())
-    # df = read_data_file_sql(condition=condition)
-    #
-    #
-    # # Применяем функцию и получаем статус и правильную группу здоровья
-    # results = df.apply(lambda row: check_diagnosis(row, hash_map), axis=1)
-    #
-    # # Разделяем результаты на два столбца
-    # df['Соответствие МКБ 10'] = results.apply(lambda x: x[0])  # Статус ("Да", "Нет", "Отсутствует")
-    # df['Правильная группа здоровья'] = results.apply(lambda x: x[1])  # Группа здоровья
-
-
-    # write_result(df)
-
-
-
-proces_check()
-

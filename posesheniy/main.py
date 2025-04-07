@@ -46,7 +46,7 @@ def main():
         if row_0.startswith('ГАУЗ') or row_0.startswith('ГБУЗ'):
             mo = row.iloc[0]
         if row_0.startswith('ИТОГО'):
-            if ('ЖЕНСК' in row_0 and 'КОН' in row_0) or ('ЖК' in row_0):
+            if ('ЖЕНСК' in row_0 and 'КОН' in row_0) or ('ЖК' in row_0) and not ('ЛУЖКИ' in row_0):
                 result_dict['МО'].append(mo)
                 result_dict['СП'].append(row.iloc[0])
                 result_dict['Всего'].append(int(row.iloc[2]))
