@@ -17,8 +17,8 @@ def get_df_from_xlsx(path: Path, skip_rows: int = 0) -> pd.DataFrame:
 
 # ----------------
 
-def save_xlsx(df: pd.DataFrame, path_to: str, name: str = 'result'):
-    with pd.ExcelWriter(Path(path_to + f'{name}.xlsx')) as writer:
+def save_xlsx(df: pd.DataFrame, name: str = 'result'):
+    with pd.ExcelWriter(Path(f'{name}.xlsx')) as writer:
         df.to_excel(writer, index=False, sheet_name='A')
         writer.sheets['A'].autofit()
         writer.sheets['A'].autofilter(0, 0, df.shape[0], df.shape[1])
